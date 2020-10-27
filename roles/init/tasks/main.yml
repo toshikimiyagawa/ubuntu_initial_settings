@@ -1,0 +1,81 @@
+- name: Run the equivalent of "apt-get update" as a separate step
+  apt:
+    update_cache: yes
+  become: yes
+
+- name: Upgrade all packages to the latest version
+  apt:
+    upgrade: 'yes'
+  become: yes
+
+- name: "Install multi packages"
+  apt:
+    name:
+      - neovim
+      - fish
+      - tmux
+      - git
+      - golang
+      - fonts-powerline
+      - fzf
+    state: latest
+  become: yes
+
+- name: "Change default shell"
+  command: "chsh -s {{ fish_bin }} {{ login_user }}" 
+  become: yes
+  when: lookup("env", "SHELL") != fish_bin
+
+- name: "Check ghq"
+  stat:
+    path: /home/{{ login_user }}/go/bin/ghq
+  register: bin_ghq
+
+- name: "Install ghq"
+  command: "go get github.com/motemen/ghq"
+  when: not bin_ghq.stat.exists
+
+- name: "git clone conffiles"
+  command: "/home/{{ login_user }}/go/bin/ghq get -p {{ login_user }}miyagawa/dotfiles"
+
+- name: "Check .config"
+  stat:
+    path: /home/{{ login_user }}/.config
+  register: dot_config
+
+- name: "Check .tmux.conf"
+  stat:
+    path: /home/{{ login_user }}/.tmux.conf
+  register: dot_tmux_conf
+
+- name: "Check .gitconfig"
+  stat:
+    path: /home/{{ login_user }}/.gitconfig
+  register: dot_gitconfig
+
+- name: "Remove .config"
+  file:
+    path: /home/{{ login_user }}/.config
+    state: absent
+  when: dot_config.stat.islnk is not defined or not dot_config.stat.islnk
+
+- name: "Symlink dotfiles"
+  file:
+    src: /home/{{ login_user }}/ghq/github.com/{{ login_user }}miyagawa/dotfiles/.config
+    dest: /home/{{ login_user }}/.config
+    state: link
+  when: dot_config.stat.islnk is not defined or not dot_config.stat.islnk
+
+- name: "Symlink dotfiles"
+  file:
+    src: /home/{{ login_user }}/ghq/github.com/{{ login_user }}miyagawa/dotfiles/.tmux.conf
+    dest: /home/{{ login_user }}/.tmux.conf
+    state: link
+  when: dot_tmux_conf.stat.islnk is not defined or not dot_tmux_conf.stat.islnk
+
+- name: "Symlink dotfiles"
+  file:
+    src: /home/{{ login_user }}/ghq/github.com/{{ login_user }}miyagawa/dotfiles/.gitconfig
+    dest: /home/{{ login_user }}/.gitconfig
+    state: link
+  when: dot_gitconfig.stat.islnk is not defined or not dot_gitconfig.stat.islnk
